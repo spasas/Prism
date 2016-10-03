@@ -90,23 +90,13 @@ namespace Prism.Commands
             OnCanExecuteChanged();
         }
 
-        async void ICommand.Execute(object parameter)
-        {
-            await Execute(parameter);
-        }
-
-        bool ICommand.CanExecute(object parameter)
-        {
-            return CanExecute(parameter);
-        }
-
         /// <summary>
         /// Executes the command with the provided parameter by invoking the <see cref="Action{Object}"/> supplied during construction.
         /// </summary>
         /// <param name="parameter"></param>
-		protected virtual async Task Execute(object parameter)
+        public virtual void Execute(object parameter = null)
         {
-            await _executeMethod(parameter);
+            _executeMethod(parameter);
         }
 
         /// <summary>
@@ -114,7 +104,7 @@ namespace Prism.Commands
         /// </summary>
         /// <param name="parameter">The parameter to use when determining if this command can execute.</param>
         /// <returns>Returns <see langword="true"/> if the command can execute.  <see langword="False"/> otherwise.</returns>
-        protected virtual bool CanExecute(object parameter)
+        public virtual bool CanExecute(object parameter = null)
         {
             return _canExecuteMethod(parameter);
         }

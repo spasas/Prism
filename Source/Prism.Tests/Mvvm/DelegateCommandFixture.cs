@@ -2,11 +2,8 @@ using System;
 using System.Windows.Input;
 using Xunit;
 using Prism.Commands;
-using System.Threading.Tasks;
 using Prism.Tests.Mocks.Commands;
 using Prism.Mvvm;
-using System.Threading;
-using Xunit.Sdk;
 
 namespace Prism.Tests.Mvvm
 {
@@ -49,13 +46,13 @@ namespace Prism.Tests.Mvvm
         }
 
         [Fact]
-        public async Task ExecuteCallsPassedInExecuteDelegate()
+        public void ExecuteCallsPassedInExecuteDelegate()
         {
             var handlers = new DelegateHandlers();
             var command = new DelegateCommand<object>(handlers.Execute);
             object parameter = new object();
 
-            await command.Execute(parameter);
+            command.Execute(parameter);
 
             Assert.Same(parameter, handlers.ExecuteParameter);
         }
@@ -199,17 +196,6 @@ namespace Prism.Tests.Mvvm
             });
         }
 
-        //TODO: BBL: This test fails intermittently.  The cause is unknown, but we think it may be a race condition issue.
-        //In order to reduce the friction of our automated build processes, we are commenting out this test.
-        //[Fact]
-        //public void NonGenericDelegateCommandShouldInvokeExplicitExecuteFunc()
-        //{
-        //    bool executed = false;
-        //    ICommand command = DelegateCommand.FromAsyncHandler(async () => await Task.Run(() => { executed = true; }));
-        //    command.Execute(null);
-        //    Assert.True(executed);
-        //}
-
         [Fact]
         public void IsActivePropertyIsFalseByDeafult()
         {
@@ -229,11 +215,11 @@ namespace Prism.Tests.Mvvm
         }
 
         [Fact]
-        public async Task NonGenericDelegateCommandExecuteShouldInvokeExecuteAction()
+        public void NonGenericDelegateCommandExecuteShouldInvokeExecuteAction()
         {
             bool executed = false;
             var command = new DelegateCommand(() => { executed = true; });
-            await command.Execute();
+            command.Execute();
 
             Assert.True(executed);
         }
@@ -285,46 +271,6 @@ namespace Prism.Tests.Mvvm
         }
 
         [Fact]
-        public void GenericDelegateCommandFromAsyncHandlerWithExecuteFuncShouldNotBeNull()
-        {
-            var command = DelegateCommand<object>.FromAsyncHandler(async (o) => await Task.Run(() => { }));
-            Assert.NotNull(command);
-        }
-
-        [Fact]
-        public void GenericDelegateCommandFromAsyncHandlerWithExecuteAndCanExecuteFuncShouldNotBeNull()
-        {
-            var command = DelegateCommand<object>.FromAsyncHandler(async (o) => await Task.Run(() => { }), (o) => true);
-            Assert.NotNull(command);
-        }
-
-        [Fact]
-        public void GenericDelegateCommandFromAsyncHandlerCanExecuteShouldBeTrueByDefault()
-        {
-            var command = DelegateCommand<object>.FromAsyncHandler(async (o) => await Task.Run(() => { }));
-            var canExecute = command.CanExecute(null);
-            Assert.True(canExecute);
-        }
-
-        [Fact]
-        public void GenericDelegateCommandFromAsyncHandlerWithNullExecuteFuncShouldThrow()
-        {
-            Assert.Throws<ArgumentNullException>(() =>
-            {
-                var command = DelegateCommand<object>.FromAsyncHandler(null);
-            });
-        }
-
-        [Fact]
-        public void GenericDelegateCommandFromAsyncHandlerWithNullCanExecuteFuncShouldThrow()
-        {
-            Assert.Throws<ArgumentNullException>(() =>
-            {
-                var command = DelegateCommand<object>.FromAsyncHandler(async (o) => await Task.Run(() => { }), null);
-            });
-        }
-
-        [Fact]
         public void DelegateCommandBaseWithNullExecuteFuncShouldThrow()
         {
             Assert.Throws<ArgumentNullException>(() =>
@@ -334,82 +280,42 @@ namespace Prism.Tests.Mvvm
         }
 
         [Fact]
-        public void DelegateCommandBaseWithNullCanExecuteFuncShouldThrow()
+        public void Test_should_fail_because_of_thrown_exception()
         {
-            Assert.Throws<ArgumentNullException>(() =>
+            Assert.Throws<Exception>(() =>
             {
-                var command = DelegateCommand<object>.FromAsyncHandler(async (o) => await Task.Run(() => { }), null);
+                new DelegateCommand(() => { throw new Exception(); }).Execute();
             });
         }
 
         [Fact]
-        public async Task GenericDelegateCommandFromAsyncHandlerExecuteShouldInvokeExecuteFunc()
+        public void Test_should_fail_because_of_thrown_exception_generic()
         {
-            bool executed = false;
-
-            var command = DelegateCommand<object>.FromAsyncHandler(async (o) => await Task.Run(() => executed = true));
-            await command.Execute(null);
-
-            Assert.True(executed);
-        }
-
-        [Fact]
-        public void DelegateCommandFromAsyncHandlerWithExecuteFuncShouldNotBeNull()
-        {
-            var command = DelegateCommand.FromAsyncHandler(async () => await Task.Run(() => { }));
-            Assert.NotNull(command);
-        }
-
-        [Fact]
-        public void DelegateCommandFromAsyncHandlerCanExecuteShouldBeTrueByDefault()
-        {
-            var command = DelegateCommand.FromAsyncHandler(async () => await Task.Run(() => { }));
-            var canExecute = command.CanExecute();
-            Assert.True(canExecute);
-        }
-
-        [Fact]
-        public void DelegateCommandFromAsyncHandlerWithNullExecuteFuncShouldThrow()
-        {
-            Assert.Throws<ArgumentNullException>(() =>
+            Assert.Throws<Exception>(() =>
             {
-                var command = DelegateCommand.FromAsyncHandler(null);
+                new DelegateCommand<object>((o) => { throw new Exception(); }).Execute(null);
             });
         }
 
         [Fact]
-        public void DelegateCommandFromAsyncHandlerWithExecuteAndCanExecuteFuncShouldNotBeNull()
+        public void Test_should_fail_because_of_thrown_exception_ICommand()
         {
-            var command = DelegateCommand.FromAsyncHandler(async () => await Task.Run(() => { }), () => true);
-            Assert.NotNull(command);
-        }
-
-        [Fact]
-        public void DelegateCommandFromAsyncHandlerWithNullCanExecuteFuncShouldThrow()
-        {
-            Assert.Throws<ArgumentNullException>(() =>
+            Assert.Throws<Exception>(() =>
             {
-                var command = DelegateCommand.FromAsyncHandler(async () => await Task.Run(() => { }), null);
+                ICommand command = new DelegateCommand(() => { throw new Exception(); });
+                command.Execute(null);
             });
         }
 
         [Fact]
-        public async Task DelegateCommandFromAsyncHandlerExecuteShouldInvokeExecuteFunc()
+        public void Test_should_fail_because_of_thrown_exception_generic_ICommand()
         {
-            bool executed = false;
+            Assert.Throws<Exception>(() =>
+            {
 
-            var command = DelegateCommand.FromAsyncHandler(async () => await Task.Run(() => executed = true));
-            await command.Execute();
-
-            Assert.True(executed);
-        }
-
-        [Fact]
-        public void DelegateCommandFromAsyncHandlerCanExecuteShouldInvokeCanExecuteFunc()
-        {
-            var command = DelegateCommand.FromAsyncHandler(async () => await Task.Run(() => { }), () => true);
-            var canExecute = command.CanExecute();
-            Assert.True(canExecute);
+                ICommand command = new DelegateCommand<object>((o) => { throw new Exception(); });
+                command.Execute(null);
+            });
         }
 
         [Fact]
@@ -507,7 +413,6 @@ namespace Prism.Tests.Mvvm
                 DelegateCommand command = new DelegateCommand(() => { }).ObservesProperty(() => IntProperty).ObservesProperty(() => IntProperty);
             });
         }
-
 
         [Fact]
         public void GenericDelegateCommandShouldObserveCanExecute()
