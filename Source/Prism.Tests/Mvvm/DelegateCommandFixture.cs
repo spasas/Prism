@@ -271,15 +271,6 @@ namespace Prism.Tests.Mvvm
         }
 
         [Fact]
-        public void DelegateCommandBaseWithNullExecuteFuncShouldThrow()
-        {
-            Assert.Throws<ArgumentNullException>(() =>
-            {
-                var command = DelegateCommandMock.FromAsyncHandler(null);
-            });
-        }
-
-        [Fact]
         public void Test_should_fail_because_of_thrown_exception()
         {
             Assert.Throws<Exception>(() =>

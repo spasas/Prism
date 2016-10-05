@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
-using System.Threading.Tasks;
 using System.Windows.Input;
 using Prism.Mvvm;
 using Prism.Properties;
@@ -24,7 +23,7 @@ namespace Prism.Commands
         private INotifyPropertyChanged _inpc;
 
         [CLSCompliant(false)] // Non-private identifier beginning with underscore breaks compliance.
-        protected readonly Func<object, Task> _executeMethod;
+        protected readonly Action<object> _executeMethod;
         [CLSCompliant(false)] // Non-private identifier beginning with underscore breaks compliance.
         protected Func<object, bool> _canExecuteMethod;
 
@@ -34,21 +33,6 @@ namespace Prism.Commands
         /// <param name="executeMethod">The <see cref="Action"/> to execute when <see cref="ICommand.Execute"/> is invoked.</param>
         /// <param name="canExecuteMethod">The <see cref="Func{Object,Bool}"/> to invoked when <see cref="ICommand.CanExecute"/> is invoked.</param>
         protected DelegateCommandBase(Action<object> executeMethod, Func<object, bool> canExecuteMethod)
-        {
-            if (executeMethod == null || canExecuteMethod == null)
-                throw new ArgumentNullException(nameof(executeMethod), Resources.DelegateCommandDelegatesCannotBeNull);
-
-            _executeMethod = (arg) => { executeMethod(arg); return Task.Delay(0); };
-            _canExecuteMethod = canExecuteMethod;
-            _synchronizationContext = SynchronizationContext.Current;
-        }
-
-        /// <summary>
-        /// Creates a new instance of a <see cref="DelegateCommandBase"/>, specifying both the Execute action as an awaitable Task and the CanExecute function.
-        /// </summary>
-        /// <param name="executeMethod">The <see cref="Func{Object,Task}"/> to execute when <see cref="ICommand.Execute"/> is invoked.</param>
-        /// <param name="canExecuteMethod">The <see cref="Func{Object,Bool}"/> to invoked when <see cref="ICommand.CanExecute"/> is invoked.</param>
-        protected DelegateCommandBase(Func<object, Task> executeMethod, Func<object, bool> canExecuteMethod)
         {
             if (executeMethod == null || canExecuteMethod == null)
                 throw new ArgumentNullException(nameof(executeMethod), Resources.DelegateCommandDelegatesCannotBeNull);
