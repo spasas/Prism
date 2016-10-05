@@ -74,23 +74,33 @@ namespace Prism.Commands
             OnCanExecuteChanged();
         }
 
+        void ICommand.Execute(object parameter)
+        {
+            Execute(parameter);
+        }
+
+        bool ICommand.CanExecute(object parameter)
+        {
+            return CanExecute(parameter);
+        }
+
         /// <summary>
         /// Executes the command with the provided parameter by invoking the <see cref="Action{Object}"/> supplied during construction.
         /// </summary>
         /// <param name="parameter"></param>
-        public virtual void Execute(object parameter = null)
+        protected virtual void Execute(object parameter)
         {
             _executeMethod(parameter);
         }
 
         /// <summary>
-        /// Determines if the command can execute with the provided parameter by invoking the <see cref="Func{Object,Bool}"/> supplied during construction.
+        /// Determines if the command can execute with the provided parameter by invoing the <see cref="Func{Object,Bool}"/> supplied during construction.
         /// </summary>
         /// <param name="parameter">The parameter to use when determining if this command can execute.</param>
         /// <returns>Returns <see langword="true"/> if the command can execute.  <see langword="False"/> otherwise.</returns>
-        public virtual bool CanExecute(object parameter = null)
+        protected virtual bool CanExecute(object parameter)
         {
-            return _canExecuteMethod(parameter);
+            return _canExecuteMethod == null || _canExecuteMethod(parameter);
         }
 
         /// <summary>

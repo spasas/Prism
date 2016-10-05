@@ -67,6 +67,27 @@ namespace Prism.Commands
 
         }
 
+        ///<summary>
+        ///Determines if the command can execute by invoked the <see cref="Func{T,Bool}"/> provided during construction.
+        ///</summary>
+        ///<param name="parameter">Data used by the command to determine if it can execute.</param>
+        ///<returns>
+        ///<see langword="true" /> if this command can be executed; otherwise, <see langword="false" />.
+        ///</returns>
+        public bool CanExecute(T parameter)
+        {
+            return base.CanExecute(parameter);
+        }
+
+        ///<summary>
+        ///Executes the command and invokes the <see cref="Action{T}"/> provided during construction.
+        ///</summary>
+        ///<param name="parameter">Data used by the command.</param>
+        public void Execute(T parameter)
+        {
+            base.Execute(parameter);
+        }
+
         /// <summary>
         /// Observes a property that implements INotifyPropertyChanged, and automatically calls DelegateCommandBase.RaiseCanExecuteChanged on property changed notifications.
         /// </summary>

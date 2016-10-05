@@ -33,6 +33,23 @@ namespace Prism.Commands
                 throw new ArgumentNullException(nameof(executeMethod), Resources.DelegateCommandDelegatesCannotBeNull);
         }
 
+        ///<summary>
+        /// Executes the command.
+        ///</summary>
+        public void Execute()
+        {
+            Execute(null);
+        }
+
+        /// <summary>
+        /// Determines if the command can be executed.
+        /// </summary>
+        /// <returns>Returns <see langword="true"/> if the command can execute,otherwise returns <see langword="false"/>.</returns>
+        public bool CanExecute()
+        {
+            return CanExecute(null);
+        }
+
         /// <summary>
         /// Observes a property that implements INotifyPropertyChanged, and automatically calls DelegateCommandBase.RaiseCanExecuteChanged on property changed notifications.
         /// </summary>
