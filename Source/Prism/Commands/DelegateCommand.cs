@@ -9,7 +9,7 @@ namespace Prism.Commands
     /// </summary>
     /// <see cref="DelegateCommandBase"/>
     /// <see cref="DelegateCommand{T}"/>
-    public class DelegateCommand : DelegateCommandBase
+    public sealed class DelegateCommand : DelegateCommandBase
     {
         /// <summary>
         /// Creates a new instance of <see cref="DelegateCommand"/> with the <see cref="Action"/> to invoke on execution.
@@ -31,6 +31,23 @@ namespace Prism.Commands
         {
             if (executeMethod == null || canExecuteMethod == null)
                 throw new ArgumentNullException(nameof(executeMethod), Resources.DelegateCommandDelegatesCannotBeNull);
+        }
+
+        ///<summary>
+        /// Executes the command.
+        ///</summary>
+        public void Execute()
+        {
+            base.Execute(null);
+        }
+
+        /// <summary>
+        /// Determines if the command can be executed.
+        /// </summary>
+        /// <returns>Returns <see langword="true"/> if the command can execute,otherwise returns <see langword="false"/>.</returns>
+        public bool CanExecute()
+        {
+            return base.CanExecute(null);
         }
 
         /// <summary>
