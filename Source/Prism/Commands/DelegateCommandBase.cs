@@ -7,188 +7,209 @@ using System.Windows.Input;
 using Prism.Mvvm;
 using Prism.Properties;
 using System.Threading;
+using Prism.Events;
 
 namespace Prism.Commands
 {
-    /// <summary>
-    /// An <see cref="ICommand"/> whose delegates can be attached for <see cref="Execute"/> and <see cref="CanExecute"/>.
-    /// </summary>
-    public abstract class DelegateCommandBase : ICommand, IActiveAware
-    {
-        private bool _isActive;
+   /// <summary>
+   /// An <see cref="ICommand"/> whose delegates can be attached for <see cref="Execute"/> and <see cref="CanExecute"/>.
+   /// </summary>
+   public abstract class DelegateCommandBase : ICommand, IActiveAware
+   {
+      private bool _isActive;
+      private ThreadOption _threadOption;
 
-        private SynchronizationContext _synchronizationContext;
+      private SynchronizationContext _synchronizationContext;
 
-        readonly HashSet<string> _propertiesToObserve = new HashSet<string>();
-        private INotifyPropertyChanged _inpc;
+      readonly HashSet<string> _propertiesToObserve = new HashSet<string>();
+      private INotifyPropertyChanged _inpc;
 
-        [CLSCompliant(false)] // Non-private identifier beginning with underscore breaks compliance.
-        protected readonly Action<object> _executeMethod;
-        [CLSCompliant(false)] // Non-private identifier beginning with underscore breaks compliance.
-        protected Func<object, bool> _canExecuteMethod;
+      [CLSCompliant(false)] // Non-private identifier beginning with underscore breaks compliance.
+      protected readonly IEventSubscription _executeMethod;
+      [CLSCompliant(false)] // Non-private identifier beginning with underscore breaks compliance.
+      protected Func<object, bool> _canExecuteMethod;
 
-        /// <summary>
-        /// Creates a new instance of a <see cref="DelegateCommandBase"/>, specifying both the execute action and the can execute function.
-        /// </summary>
-        /// <param name="executeMethod">The <see cref="Action"/> to execute when <see cref="ICommand.Execute"/> is invoked.</param>
-        /// <param name="canExecuteMethod">The <see cref="Func{Object,Bool}"/> to invoked when <see cref="ICommand.CanExecute"/> is invoked.</param>
-        protected DelegateCommandBase(Action<object> executeMethod, Func<object, bool> canExecuteMethod)
-        {
-            if (executeMethod == null || canExecuteMethod == null)
-                throw new ArgumentNullException(nameof(executeMethod), Resources.DelegateCommandDelegatesCannotBeNull);
+      /// <summary>
+      /// Creates a new instance of a <see cref="DelegateCommandBase"/>, specifying both the execute action and the can execute function.
+      /// </summary>
+      /// <param name="executeMethod">The <see cref="Action"/> to execute when <see cref="ICommand.Execute"/> is invoked.</param>
+      /// <param name="canExecuteMethod">The <see cref="Func{Object,Bool}"/> to invoked when <see cref="ICommand.CanExecute"/> is invoked.</param>
+      protected DelegateCommandBase(Action<object> executeMethod, Func<object, bool> canExecuteMethod, ThreadOption threadOption)
+      {
+         if (executeMethod == null || canExecuteMethod == null)
+            throw new ArgumentNullException(nameof(executeMethod), Resources.DelegateCommandDelegatesCannotBeNull);
 
-            _executeMethod = executeMethod;
-            _canExecuteMethod = canExecuteMethod;
-            _synchronizationContext = SynchronizationContext.Current;
-        }
+         _canExecuteMethod = canExecuteMethod;
+         _synchronizationContext = SynchronizationContext.Current;
 
-        /// <summary>
-        /// Occurs when changes occur that affect whether or not the command should execute.
-        /// </summary>
-        public virtual event EventHandler CanExecuteChanged;
+         IDelegateReference executeReference = new DelegateReference(executeMethod, true);
+         IDelegateReference filter = new DelegateReference(new Predicate<object>((object param0) => true), true);
 
-        /// <summary>
-        /// Raises <see cref="ICommand.CanExecuteChanged"/> so every 
-        /// command invoker can requery <see cref="ICommand.CanExecute"/>.
-        /// </summary>
-        protected virtual void OnCanExecuteChanged()
-        {
-            var handler = CanExecuteChanged;
-            if (handler != null)
+         switch (threadOption)
+         {
+            case ThreadOption.PublisherThread:
+               _executeMethod = new EventSubscription<object>(executeReference, filter);
+               break;
+            case ThreadOption.BackgroundThread:
+               _executeMethod = new BackgroundEventSubscription<object>(executeReference, filter);
+               break;
+            case ThreadOption.UIThread:
+               if (_synchronizationContext == null) throw new InvalidOperationException(Resources.EventAggregatorNotConstructedOnUIThread);
+               _executeMethod = new DispatcherEventSubscription<object>(executeReference, filter, _synchronizationContext);
+               break;
+            default:
+               _executeMethod = new EventSubscription<object>(executeReference, filter);
+               break;
+         }
+      }
+
+      /// <summary>
+      /// Occurs when changes occur that affect whether or not the command should execute.
+      /// </summary>
+      public virtual event EventHandler CanExecuteChanged;
+
+      /// <summary>
+      /// Raises <see cref="ICommand.CanExecuteChanged"/> so every
+      /// command invoker can requery <see cref="ICommand.CanExecute"/>.
+      /// </summary>
+      protected virtual void OnCanExecuteChanged()
+      {
+         var handler = CanExecuteChanged;
+         if (handler != null)
+         {
+            if (_synchronizationContext != null && _synchronizationContext != SynchronizationContext.Current)
+               _synchronizationContext.Post((o) => handler.Invoke(this, EventArgs.Empty), null);
+            else
+               handler.Invoke(this, EventArgs.Empty);
+         }
+      }
+
+      /// <summary>
+      /// Raises <see cref="DelegateCommandBase.CanExecuteChanged"/> so every command invoker
+      /// can requery to check if the command can execute.
+      /// <remarks>Note that this will trigger the execution of <see cref="DelegateCommandBase.CanExecute"/> once for each invoker.</remarks>
+      /// </summary>
+      [SuppressMessage("Microsoft.Design", "CA1030:UseEventsWhereAppropriate")]
+      public void RaiseCanExecuteChanged()
+      {
+         OnCanExecuteChanged();
+      }
+
+      void ICommand.Execute(object parameter)
+      {
+         Execute(parameter);
+      }
+
+      bool ICommand.CanExecute(object parameter)
+      {
+         return CanExecute(parameter);
+      }
+
+      /// <summary>
+      /// Executes the command with the provided parameter by invoking the <see cref="Action{Object}"/> supplied during construction.
+      /// </summary>
+      /// <param name="parameter"></param>
+      protected void Execute(object parameter)
+      {
+         _executeMethod.GetExecutionStrategy()(new[] { parameter });
+      }
+
+      /// <summary>
+      /// Determines if the command can execute with the provided parameter by invoing the <see cref="Func{Object,Bool}"/> supplied during construction.
+      /// </summary>
+      /// <param name="parameter">The parameter to use when determining if this command can execute.</param>
+      /// <returns>Returns <see langword="true"/> if the command can execute.  <see langword="False"/> otherwise.</returns>
+      protected bool CanExecute(object parameter)
+      {
+         return _canExecuteMethod == null || _canExecuteMethod(parameter);
+      }
+
+      /// <summary>
+      /// Observes a property that implements INotifyPropertyChanged, and automatically calls DelegateCommandBase.RaiseCanExecuteChanged on property changed notifications.
+      /// </summary>
+      /// <typeparam name="T">The object type containing the property specified in the expression.</typeparam>
+      /// <param name="propertyExpression">The property expression. Example: ObservesProperty(() => PropertyName).</param>
+      /// <returns>The current instance of DelegateCommand</returns>
+      protected internal void ObservesPropertyInternal<T>(Expression<Func<T>> propertyExpression)
+      {
+         AddPropertyToObserve(PropertySupport.ExtractPropertyName(propertyExpression));
+         HookInpc(propertyExpression.Body as MemberExpression);
+      }
+
+      /// <summary>
+      /// Observes a property that is used to determine if this command can execute, and if it implements INotifyPropertyChanged it will automatically call DelegateCommandBase.RaiseCanExecuteChanged on property changed notifications.
+      /// </summary>
+      /// <param name="canExecuteExpression">The property expression. Example: ObservesCanExecute((o) => PropertyName).</param>
+      /// <returns>The current instance of DelegateCommand</returns>
+      protected internal void ObservesCanExecuteInternal(Expression<Func<object, bool>> canExecuteExpression)
+      {
+         _canExecuteMethod = canExecuteExpression.Compile();
+         AddPropertyToObserve(PropertySupport.ExtractPropertyNameFromLambda(canExecuteExpression));
+         HookInpc(canExecuteExpression.Body as MemberExpression);
+      }
+
+      protected void HookInpc(MemberExpression expression)
+      {
+         if (expression == null)
+            return;
+
+         if (_inpc == null)
+         {
+            var constantExpression = expression.Expression as ConstantExpression;
+            if (constantExpression != null)
             {
-                if (_synchronizationContext != null && _synchronizationContext != SynchronizationContext.Current)
-                    _synchronizationContext.Post((o) => handler.Invoke(this, EventArgs.Empty), null);
-                else
-                    handler.Invoke(this, EventArgs.Empty);
+               _inpc = constantExpression.Value as INotifyPropertyChanged;
+               if (_inpc != null)
+                  _inpc.PropertyChanged += Inpc_PropertyChanged;
             }
-        }
+         }
+      }
 
-        /// <summary>
-        /// Raises <see cref="DelegateCommandBase.CanExecuteChanged"/> so every command invoker
-        /// can requery to check if the command can execute.
-        /// <remarks>Note that this will trigger the execution of <see cref="DelegateCommandBase.CanExecute"/> once for each invoker.</remarks>
-        /// </summary>
-        [SuppressMessage("Microsoft.Design", "CA1030:UseEventsWhereAppropriate")]
-        public void RaiseCanExecuteChanged()
-        {
-            OnCanExecuteChanged();
-        }
+      protected void AddPropertyToObserve(string property)
+      {
+         if (_propertiesToObserve.Contains(property))
+            throw new ArgumentException(String.Format("{0} is already being observed.", property));
 
-        void ICommand.Execute(object parameter)
-        {
-            Execute(parameter);
-        }
+         _propertiesToObserve.Add(property);
+      }
 
-        bool ICommand.CanExecute(object parameter)
-        {
-            return CanExecute(parameter);
-        }
+      void Inpc_PropertyChanged(object sender, PropertyChangedEventArgs e)
+      {
+         if (_propertiesToObserve.Contains(e.PropertyName))
+            RaiseCanExecuteChanged();
+      }
 
-        /// <summary>
-        /// Executes the command with the provided parameter by invoking the <see cref="Action{Object}"/> supplied during construction.
-        /// </summary>
-        /// <param name="parameter"></param>
-        protected void Execute(object parameter)
-        {
-            _executeMethod(parameter);
-        }
-
-        /// <summary>
-        /// Determines if the command can execute with the provided parameter by invoing the <see cref="Func{Object,Bool}"/> supplied during construction.
-        /// </summary>
-        /// <param name="parameter">The parameter to use when determining if this command can execute.</param>
-        /// <returns>Returns <see langword="true"/> if the command can execute.  <see langword="False"/> otherwise.</returns>
-        protected bool CanExecute(object parameter)
-        {
-            return _canExecuteMethod == null || _canExecuteMethod(parameter);
-        }
-
-        /// <summary>
-        /// Observes a property that implements INotifyPropertyChanged, and automatically calls DelegateCommandBase.RaiseCanExecuteChanged on property changed notifications.
-        /// </summary>
-        /// <typeparam name="T">The object type containing the property specified in the expression.</typeparam>
-        /// <param name="propertyExpression">The property expression. Example: ObservesProperty(() => PropertyName).</param>
-        /// <returns>The current instance of DelegateCommand</returns>
-        protected internal void ObservesPropertyInternal<T>(Expression<Func<T>> propertyExpression)
-        {
-            AddPropertyToObserve(PropertySupport.ExtractPropertyName(propertyExpression));
-            HookInpc(propertyExpression.Body as MemberExpression);
-        }
-
-        /// <summary>
-        /// Observes a property that is used to determine if this command can execute, and if it implements INotifyPropertyChanged it will automatically call DelegateCommandBase.RaiseCanExecuteChanged on property changed notifications.
-        /// </summary>
-        /// <param name="canExecuteExpression">The property expression. Example: ObservesCanExecute((o) => PropertyName).</param>
-        /// <returns>The current instance of DelegateCommand</returns>
-        protected internal void ObservesCanExecuteInternal(Expression<Func<object, bool>> canExecuteExpression)
-        {
-            _canExecuteMethod = canExecuteExpression.Compile();
-            AddPropertyToObserve(PropertySupport.ExtractPropertyNameFromLambda(canExecuteExpression));
-            HookInpc(canExecuteExpression.Body as MemberExpression);
-        }
-
-        protected void HookInpc(MemberExpression expression)
-        {
-            if (expression == null)
-                return;
-
-            if (_inpc == null)
+      #region IsActive
+      /// <summary>
+      /// Gets or sets a value indicating whether the object is active.
+      /// </summary>
+      /// <value><see langword="true" /> if the object is active; otherwise <see langword="false" />.</value>
+      public bool IsActive
+      {
+         get { return _isActive; }
+         set
+         {
+            if (_isActive != value)
             {
-                var constantExpression = expression.Expression as ConstantExpression;
-                if (constantExpression != null)
-                {
-                    _inpc = constantExpression.Value as INotifyPropertyChanged;
-                    if (_inpc != null)
-                        _inpc.PropertyChanged += Inpc_PropertyChanged;
-                }
+               _isActive = value;
+               OnIsActiveChanged();
             }
-        }
+         }
+      }
 
-        protected void AddPropertyToObserve(string property)
-        {
-            if (_propertiesToObserve.Contains(property))
-                throw new ArgumentException(String.Format("{0} is already being observed.", property));
+      /// <summary>
+      /// Fired if the <see cref="IsActive"/> property changes.
+      /// </summary>
+      public virtual event EventHandler IsActiveChanged;
 
-            _propertiesToObserve.Add(property);
-        }
-
-        void Inpc_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            if (_propertiesToObserve.Contains(e.PropertyName))
-                RaiseCanExecuteChanged();
-        }
-
-        #region IsActive
-        /// <summary>
-        /// Gets or sets a value indicating whether the object is active.
-        /// </summary>
-        /// <value><see langword="true" /> if the object is active; otherwise <see langword="false" />.</value>
-        public bool IsActive
-        {
-            get { return _isActive; }
-            set
-            {
-                if (_isActive != value)
-                {
-                    _isActive = value;
-                    OnIsActiveChanged();
-                }
-            }
-        }
-
-        /// <summary>
-        /// Fired if the <see cref="IsActive"/> property changes.
-        /// </summary>
-        public virtual event EventHandler IsActiveChanged;
-
-        /// <summary>
-        /// This raises the <see cref="DelegateCommandBase.IsActiveChanged"/> event.
-        /// </summary>
-        protected virtual void OnIsActiveChanged()
-        {
-            EventHandler isActiveChangedHandler = IsActiveChanged;
-            if (isActiveChangedHandler != null) isActiveChangedHandler(this, EventArgs.Empty);
-        }
-        #endregion
-    }
+      /// <summary>
+      /// This raises the <see cref="DelegateCommandBase.IsActiveChanged"/> event.
+      /// </summary>
+      protected virtual void OnIsActiveChanged()
+      {
+         EventHandler isActiveChangedHandler = IsActiveChanged;
+         if (isActiveChangedHandler != null) isActiveChangedHandler(this, EventArgs.Empty);
+      }
+      #endregion
+   }
 }
